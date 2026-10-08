@@ -23,24 +23,24 @@ def compute_network_risk_score(topology: Dict[str, Any]) -> Dict[str, Any]:
     if not nodes:
         return {"overall_score": 0.0, "level": "LOW", "compromised_assets": 0}
 
-    total_crit = sum(n.get("criticality", 5.0) for n in nodes)
+    total_crit = sum(float(n.get("criticality") or 5.0) for n in nodes) or 1.0
     compromised = [n for n in nodes if n.get("compromised")]
-    comp_crit = sum(n.get("criticality", 5.0) for n in compromised)
+    comp_crit = sum(float(n.get("criticality") or 5.0) for n in compromised)
 
     vulns_cvss = []
     for n in nodes:
         for v in n.get("vulnerabilities", []):
-            vulns_cvss.append(float(v.get("cvss", 5.0)))
+            vulns_cvss.append(float(v.get("cvss") or 5.0))
 
     avg_cvss = (sum(vulns_cvss) / len(vulns_cvss)) if vulns_cvss else 0.0
     compromise_ratio = len(compromised) / len(nodes)
-    critical_compromised = any(n.get("criticality", 0) >= 9.0 for n in compromised)
+    critical_compromised = any(float(n.get("criticality") or 0) >= 9.0 for n in compromised)
 
     score = (compromise_ratio * 40.0) + ((comp_crit / total_crit) * 30.0) + (avg_cvss * 3.0)
     if critical_compromised:
         score += 20.0
 
-    final_score = round(min(100.0, max(12.0, score)), 1)
+    final_score = round(min(100.0, max(0.0, score)), 1)
     if final_score >= 80:
         level = "CRITICAL"
     elif final_score >= 60:
@@ -94,3 +94,13 @@ def get_node_details(node_id: str):
     if not node:
         raise HTTPException(status_code=404, detail="Host node not found")
     return node
+
+
+@router.post("/node/{node_id}/compromise")
+def compromise_node(node_id: str):
+    """Directly sets a host as compromised for what-if adversary simulation scenarios."""
+    node = graph_engine.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Host node not found")
+    graph_engine.set_compromised(node_id, True)
+    return {"status": "COMPROMISED", "node_id": node_id}

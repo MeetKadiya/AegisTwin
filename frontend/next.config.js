@@ -3,7 +3,8 @@ const nextConfig = {
   reactStrictMode: false,
   output: "standalone",
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://backend:8000";
+    // ponytail: fallback to localhost allows running 'npm run dev' without Docker environment variables
+    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     return [
       {
         source: "/api/:path*",

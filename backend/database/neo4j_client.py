@@ -181,11 +181,11 @@ class GraphEngine:
         # Calculate metrics
         critical_assets_hit = [
             n for n in reachable_nodes
-            if n.get("criticality", 0) >= 8.5
+            if float(n.get("criticality") or 0) >= 8.5
         ]
 
-        total_criticality = sum(n.get("criticality", 0) for n in reachable_nodes)
-        max_possible_criticality = sum(n.get("criticality", 0) for n in self.nodes.values()) or 1.0
+        total_criticality = sum(float(n.get("criticality") or 0) for n in reachable_nodes)
+        max_possible_criticality = sum(float(n.get("criticality") or 0) for n in self.nodes.values()) or 1.0
 
         # Vulnerabilities exposed along downstream path
         total_vulns = sum(len(n.get("vulnerabilities", [])) for n in reachable_nodes)
@@ -227,7 +227,7 @@ class GraphEngine:
         - 'patch_cve': removes specified CVE from node
         - 'isolate_node': severs all incoming/outgoing edges of a node
         - 'block_edge': blocks specific network connection
-        - 'revoke_credential': removes credential node or access relationship
+        - 'revoke_credential': removes credential from host node
         """
         details = details or {}
         modified = False
@@ -246,7 +246,6 @@ class GraphEngine:
                     )
 
         elif action_type == "isolate_node":
-            # Set status to isolated
             if target_id in self.nodes:
                 self.nodes[target_id]["isolated"] = True
             for edge in self.edges:
@@ -264,8 +263,10 @@ class GraphEngine:
             source = details.get("source")
             target = details.get("target")
             for edge in self.edges:
-                if (source and target and edge["source"] == source and edge["target"] == target) or edge.get("id") == target_edge_id:
+                if (source and target and edge["source"] == source and edge["target"] == target) or (target_edge_id and edge.get("id") == target_edge_id):
                     edge["status"] = "blocked"
+                    source = source or edge["source"]
+                    target = target or edge["target"]
                     modified = True
             if self.is_neo4j_connected and source and target:
                 self.run_cypher(
@@ -274,11 +275,22 @@ class GraphEngine:
                 )
 
         elif action_type == "revoke_credential":
-            cred_id = target_id
-            for edge in self.edges:
-                if edge["target"] == cred_id or edge["source"] == cred_id:
-                    edge["status"] = "revoked"
+            cred_id = details.get("credential_id") or details.get("cred_id")
+            host_id = target_id if target_id in self.nodes else None
+            if not host_id and not cred_id:
+                cred_id = target_id
+
+            for node in self.nodes.values():
+                if host_id and node["id"] != host_id:
+                    continue
+                if cred_id and "credentials" in node and cred_id in node["credentials"]:
+                    node["credentials"] = [c for c in node["credentials"] if c != cred_id]
                     modified = True
+                    if self.is_neo4j_connected:
+                        self.run_cypher(
+                            "MATCH (h:Host {id: $hid}) SET h.credentials = [c IN h.credentials WHERE c <> $cred]",
+                            {"hid": node["id"], "cred": cred_id}
+                        )
 
         return {"success": modified, "action": action_type, "target": target_id}
 

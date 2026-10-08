@@ -29,6 +29,9 @@ venv/
 # Docker & Volume mounts
 neo4j_data/
 postgres_data/
+edge_buffer_data/
+*.db
+*.sqlite*
 *.log
 
 # IDE & OS

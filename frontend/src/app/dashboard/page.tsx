@@ -45,6 +45,7 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"feed" | "remediation">("feed");
+  const [connError, setConnError] = useState<string | null>(null);
 
   // Fetch topology from backend
   const fetchTopology = useCallback(async () => {
@@ -54,9 +55,13 @@ export default function DashboardPage() {
         const data = await res.json();
         setTopology({ nodes: data.nodes || [], edges: data.edges || [] });
         if (data.risk_summary) setRiskSummary(data.risk_summary);
+        setConnError(null);
+      } else {
+        setConnError(`Backend returned HTTP ${res.status}`);
       }
-    } catch (err) {
-      console.warn("API request failed, using default simulated data:", err);
+    } catch (err: any) {
+      console.warn("API request failed:", err);
+      setConnError(err?.message || "Failed to connect to backend");
     }
   }, []);
 
@@ -253,6 +258,19 @@ export default function DashboardPage() {
             <RotateCcw className="w-3 h-3" />
             Reset
           </button>
+
+          <button
+            onClick={() => {
+              fetchTopology();
+              fetchSuggestions();
+              fetchHistory();
+            }}
+            disabled={loading}
+            title="Refresh Topology & Data"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700/80 transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-accent-blue" : ""}`} />
+          </button>
         </div>
       </header>
 
@@ -305,6 +323,22 @@ export default function DashboardPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left / Center Graph Area */}
         <div className="flex-1 relative p-4 h-full">
+          {connError && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-rose-950/90 border border-rose-500/60 text-rose-200 px-4 py-2.5 rounded-xl text-xs font-mono shadow-2xl flex items-center gap-3 backdrop-blur-md">
+              <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>Backend connection warning: {connError}</span>
+              <button
+                onClick={() => {
+                  fetchTopology();
+                  fetchSuggestions();
+                  fetchHistory();
+                }}
+                className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded font-bold transition-all text-[11px]"
+              >
+                Retry
+              </button>
+            </div>
+          )}
           <NetworkGraph
             topology={topology}
             onSelectNode={handleSelectNode}
@@ -421,8 +455,13 @@ export default function DashboardPage() {
         node={selectedNode}
         blastData={blastData}
         onSimulateCompromise={async (nodeId) => {
-          // Immediately step simulation from selected node
-          await handleStepSimulation();
+          setLoading(true);
+          try {
+            await fetch(`/api/topology/node/${nodeId}/compromise`, { method: "POST" });
+            await fetchTopology();
+          } finally {
+            setLoading(false);
+          }
         }}
         onClearHighlight={() => setBlastData(null)}
       />

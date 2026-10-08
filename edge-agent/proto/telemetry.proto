@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package aegistwin.telemetry.v1;
+
+option go_package = "aegistwin/edge-agent/proto";
+
+enum ProtocolType {
+  PROTOCOL_UNSPECIFIED = 0;
+  PROTOCOL_OPC_UA = 1;
+  PROTOCOL_MQTT = 2;
+  PROTOCOL_SYSLOG = 3;
+}
+
+enum SeverityLevel {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_DEBUG = 1;
+  SEVERITY_INFO = 2;
+  SEVERITY_WARN = 3;
+  SEVERITY_ERROR = 4;
+  SEVERITY_CRITICAL = 5;
+}
+
+message MetricDataPoint {
+  string name = 1;
+  double value = 2;
+  string unit = 3;
+  int64 timestamp_ns = 4;
+}
+
+message TelemetryRecord {
+  string record_id = 1;
+  string source_id = 2;
+  ProtocolType protocol = 3;
+  SeverityLevel severity = 4;
+  int64 timestamp_ns = 5;
+  repeated MetricDataPoint metrics = 6;
+  map<string, string> attributes = 7;
+  bytes raw_payload = 8;
+  int64 ingestion_time_ns = 9;
+  uint32 schema_version = 10;
+}
+
+message TelemetryBatch {
+  string batch_id = 1;
+  string edge_agent_id = 2;
+  int64 sent_at_ns = 3;
+  repeated TelemetryRecord records = 4;
+}

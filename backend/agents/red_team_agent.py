@@ -1,7 +1,9 @@
 import os
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
+import httpx
 try:
     from ..database.neo4j_client import graph_engine
     from .mitre_mapper import get_technique_details, map_cve_to_mitre
@@ -211,9 +213,9 @@ Select the highest-impact attack step. Output strictly valid JSON matching:
         def candidate_score(c: Dict[str, Any]) -> float:
             target_id = c["target"]
             node = graph_engine.get_node(target_id) or {}
-            base = float(node.get("criticality", 5.0))
+            base = float(node.get("criticality") or 5.0)
             if c.get("vuln"):
-                base += float(c["vuln"].get("cvss", 5.0))
+                base += float(c["vuln"].get("cvss") or 5.0)
             return base
 
         candidates.sort(key=candidate_score, reverse=True)
@@ -266,9 +268,10 @@ Select the highest-impact attack step. Output strictly valid JSON matching:
 
         mitre_info = get_technique_details(technique_id)
 
+        # ponytail: standard ISO 8601 UTC timestamp replaces static mock string
         step_record = {
             "step_number": self.step_counter,
-            "timestamp": "2026-10-08T12:00:00Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "source_node": chosen["source"],
             "source_name": chosen["source_name"],
             "target_node": target_id,
@@ -279,7 +282,7 @@ Select the highest-impact attack step. Output strictly valid JSON matching:
             "technique_name": mitre_info["name"],
             "tactic": mitre_info["tactic"],
             "action_description": narrative,
-            "exploit_used": chosen.get("vuln", {}).get("cve") if chosen.get("vuln") else "Valid Accounts / Credential Pivot",
+            "exploit_used": chosen["vuln"]["cve"] if chosen.get("vuln") else ("Service Reconnaissance" if chosen.get("type") == "recon_probe" else "Valid Accounts / Credential Pivot"),
             "credentials_harvested": new_creds,
             "mitre_details": mitre_info,
             "success": True
