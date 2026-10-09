@@ -71,7 +71,7 @@ class GraphEngine:
                 node_query = """
                 MATCH (h:Host)
                 OPTIONAL MATCH (h)-[:HAS_VULN]->(v:Vulnerability)
-                WITH h, collect(properties(v)) AS vulns
+                WITH h, [vuln IN collect(v) WHERE vuln IS NOT NULL | properties(vuln)] AS vulns
                 RETURN h.id AS id, properties(h) AS props, vulns
                 """
                 edge_query = """
@@ -81,22 +81,33 @@ class GraphEngine:
                 node_records = self.run_cypher(node_query)
                 edge_records = self.run_cypher(edge_query)
                 if node_records:
+                    seen_nodes = set()
                     nodes = []
                     for r in node_records:
+                        nid = r["id"]
+                        if nid in seen_nodes:
+                            continue
+                        seen_nodes.add(nid)
                         p = dict(r["props"])
-                        p["id"] = r["id"]
+                        p["id"] = nid
                         p["type"] = "Host"
                         p["vulnerabilities"] = r.get("vulns", [])
                         nodes.append(p)
-                    edges = [
-                        {
+                    
+                    seen_edges = set()
+                    edges = []
+                    for r in edge_records:
+                        edge_key = (r["source"], r["target"])
+                        if edge_key in seen_edges:
+                            continue
+                        seen_edges.add(edge_key)
+                        edges.append({
                             "source": r["source"],
                             "target": r["target"],
                             "relation": r["relation"],
                             **r["props"]
-                        }
-                        for r in edge_records
-                    ]
+                        })
+
                     # ponytail: sync local store from authoritative Neo4j state
                     self.nodes = {n["id"]: dict(n) for n in nodes}
                     self.edges = [dict(e) for e in edges]

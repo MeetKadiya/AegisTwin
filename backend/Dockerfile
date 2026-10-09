@@ -53,7 +53,7 @@ COPY --chown=aegis:aegis . /app/
 
 # Container Healthcheck (Kubernetes will use readiness/liveness probes)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
 # Enforce non-root execution context
 USER 10001:10001

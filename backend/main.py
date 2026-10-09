@@ -74,11 +74,9 @@ def root():
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health_check():
-    topo = graph_engine.get_topology()
     return {
         "status": "healthy",
-        "neo4j_connected": graph_engine.is_neo4j_connected,
-        "node_count": len(topo["nodes"]),
-        "edge_count": len(topo["edges"])
+        "neo4j_connected": graph_engine.is_neo4j_connected
     }

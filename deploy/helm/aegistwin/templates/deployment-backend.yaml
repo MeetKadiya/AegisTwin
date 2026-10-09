@@ -60,21 +60,21 @@ spec:
                   key: encryption-key
           startupProbe:
             httpGet:
-              path: /api/health
+              path: /health
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 5
             failureThreshold: 20
           livenessProbe:
             httpGet:
-              path: /api/health
+              path: /health
               port: 8000
             initialDelaySeconds: 15
             periodSeconds: 20
             timeoutSeconds: 5
           readinessProbe:
             httpGet:
-              path: /api/health
+              path: /health
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 10

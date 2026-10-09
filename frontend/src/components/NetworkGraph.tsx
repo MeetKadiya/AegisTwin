@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, memo, useCallback } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -19,41 +19,49 @@ import {
   Database,
   Lock,
   Globe,
-  Radio,
   Flame,
   CheckCircle2,
   Terminal,
 } from "lucide-react";
 
-// Tier styling & coordinate layout mapping
+// Tier coordinate layout mapping
 export const TIER_POSITIONS: Record<string, { x: number; y: number }> = {
-  "gw-external": { x: 50, y: 220 },
-  "web-dmz-01": { x: 260, y: 140 },
-  "vpn-gateway": { x: 260, y: 320 },
-  "web-app-01": { x: 500, y: 100 },
-  "api-gateway": { x: 500, y: 240 },
-  "app-srv-01": { x: 740, y: 80 },
-  "app-srv-02": { x: 740, y: 220 },
-  "ci-cd-runner": { x: 740, y: 360 },
-  "admin-workstation-01": { x: 740, y: 480 },
-  "db-cluster-01": { x: 990, y: 120 },
-  "corp-dc-01": { x: 990, y: 360 },
-  "db-cluster-02": { x: 1200, y: 260 },
+  "gw-external": { x: 60, y: 220 },
+  "web-dmz-01": { x: 300, y: 140 },
+  "vpn-gateway": { x: 300, y: 320 },
+  "web-app-01": { x: 540, y: 100 },
+  "api-gateway": { x: 540, y: 260 },
+  "app-srv-01": { x: 780, y: 80 },
+  "app-srv-02": { x: 780, y: 220 },
+  "ci-cd-runner": { x: 780, y: 360 },
+  "admin-workstation-01": { x: 780, y: 500 },
+  "db-cluster-01": { x: 1040, y: 120 },
+  "corp-dc-01": { x: 1040, y: 360 },
+  "db-cluster-02": { x: 1260, y: 260 },
+};
+
+const TIER_X_OFFSETS: Record<string, number> = {
+  "DMZ": 200,
+  "Web Tier": 450,
+  "App Tier": 700,
+  "DB Tier": 950,
+  "Active Directory": 1100,
 };
 
 export const TIER_BADGES: Record<string, { bg: string; text: string; label: string }> = {
-  "DMZ": { bg: "bg-purple-950/60 border-purple-500/40", text: "text-purple-300", label: "DMZ" },
-  "Web Tier": { bg: "bg-blue-950/60 border-blue-500/40", text: "text-blue-300", label: "Web Tier" },
-  "App Tier": { bg: "bg-cyan-950/60 border-cyan-500/40", text: "text-cyan-300", label: "App Tier" },
-  "DB Tier": { bg: "bg-amber-950/60 border-amber-500/40", text: "text-amber-300", label: "Database" },
-  "Active Directory": { bg: "bg-rose-950/60 border-rose-500/40", text: "text-rose-300", label: "Identity / AD" },
+  "DMZ": { bg: "bg-purple-950 border-purple-500/50", text: "text-purple-300", label: "DMZ" },
+  "Web Tier": { bg: "bg-blue-950 border-blue-500/50", text: "text-blue-300", label: "Web Tier" },
+  "App Tier": { bg: "bg-cyan-950 border-cyan-500/50", text: "text-cyan-300", label: "App Tier" },
+  "DB Tier": { bg: "bg-amber-950 border-amber-500/50", text: "text-amber-300", label: "Database" },
+  "Active Directory": { bg: "bg-rose-950 border-rose-500/50", text: "text-rose-300", label: "Identity / AD" },
 };
 
-function CustomHostNode({ data }: NodeProps) {
+// High-performance memoized host node component
+const CustomHostNode = memo(function CustomHostNode({ data }: NodeProps) {
   const isCompromised = data.compromised;
   const isBlastRadius = data.isBlastRadius;
   const isIsolated = data.isolated;
-  const tierStyle = TIER_BADGES[data.tier] || { bg: "bg-slate-800", text: "text-slate-300", label: data.tier };
+  const tierStyle = TIER_BADGES[data.tier] || { bg: "bg-slate-850 border-slate-700", text: "text-slate-300", label: data.tier || "Host" };
 
   const getNodeIcon = () => {
     if (data.type === "Gateway" || data.type === "VPN") return <Globe className="w-4 h-4 text-purple-400" />;
@@ -62,7 +70,7 @@ function CustomHostNode({ data }: NodeProps) {
     return <Server className="w-4 h-4 text-cyan-400" />;
   };
 
-  let borderStyle = "border-slate-700 bg-slate-900/90";
+  let borderStyle = "border-slate-800 bg-slate-900";
   let statusBadge = (
     <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
       <CheckCircle2 className="w-3 h-3 text-emerald-400" />
@@ -71,15 +79,15 @@ function CustomHostNode({ data }: NodeProps) {
   );
 
   if (isCompromised) {
-    borderStyle = "border-rose-500 bg-rose-950/80 node-compromised shadow-lg shadow-rose-900/40";
+    borderStyle = "border-rose-500 bg-rose-950/90 shadow-md shadow-rose-950/60";
     statusBadge = (
-      <div className="flex items-center gap-1 text-[11px] text-rose-400 font-mono font-bold animate-pulse">
-        <Flame className="w-3.5 h-3.5 text-rose-500" />
+      <div className="flex items-center gap-1 text-[11px] text-rose-400 font-mono font-bold">
+        <Flame className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
         <span>COMPROMISED {data.compromise_step ? `(Step ${data.compromise_step})` : ""}</span>
       </div>
     );
   } else if (isBlastRadius) {
-    borderStyle = "border-amber-400 bg-amber-950/70 node-blast shadow-lg shadow-amber-900/40";
+    borderStyle = "border-amber-400 bg-amber-950/80 shadow-md shadow-amber-950/60";
     statusBadge = (
       <div className="flex items-center gap-1 text-[11px] text-amber-300 font-mono font-bold">
         <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
@@ -87,7 +95,7 @@ function CustomHostNode({ data }: NodeProps) {
       </div>
     );
   } else if (isIsolated) {
-    borderStyle = "border-gray-600 bg-gray-900/80 opacity-60";
+    borderStyle = "border-gray-600 bg-gray-900/90 opacity-60";
     statusBadge = (
       <div className="flex items-center gap-1 text-[11px] text-gray-400 font-mono">
         <Shield className="w-3 h-3 text-gray-400" />
@@ -96,10 +104,14 @@ function CustomHostNode({ data }: NodeProps) {
     );
   }
 
+  const handleClick = useCallback(() => {
+    data.onSelectNode?.(data);
+  }, [data]);
+
   return (
     <div
-      onClick={() => data.onSelectNode?.(data)}
-      className={`relative min-w-[210px] max-w-[240px] rounded-lg border-2 p-3 transition-all cursor-pointer backdrop-blur-md hover:scale-[1.03] select-none ${borderStyle}`}
+      onClick={handleClick}
+      className={`relative min-w-[210px] max-w-[240px] rounded-lg border p-3 cursor-pointer select-none ${borderStyle}`}
     >
       <Handle type="target" position={Position.Left} className="w-2.5 h-2.5 !bg-slate-400 border-none" />
       <Handle type="source" position={Position.Right} className="w-2.5 h-2.5 !bg-slate-400 border-none" />
@@ -110,13 +122,13 @@ function CustomHostNode({ data }: NodeProps) {
           {tierStyle.label}
         </span>
         <span className="text-[10px] font-mono px-1 rounded bg-slate-800 text-slate-300">
-          Crit: {data.criticality}/10
+          Crit: {data.criticality || 5}/10
         </span>
       </div>
 
       {/* Asset Name & Icon */}
       <div className="flex items-start gap-2 mb-2">
-        <div className="p-1.5 rounded bg-slate-800/80 border border-slate-700/50 mt-0.5">
+        <div className="p-1.5 rounded bg-slate-800 border border-slate-700 mt-0.5">
           {getNodeIcon()}
         </div>
         <div className="overflow-hidden">
@@ -130,22 +142,22 @@ function CustomHostNode({ data }: NodeProps) {
       </div>
 
       {/* Status Bar */}
-      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+      <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
         {statusBadge}
         {data.vulnerabilities && data.vulnerabilities.length > 0 && (
-          <span className="text-[10px] bg-red-950/80 text-rose-300 border border-rose-800/60 font-mono px-1.5 py-0.5 rounded">
+          <span className="text-[10px] bg-red-950 text-rose-300 border border-rose-800 font-mono px-1.5 py-0.5 rounded">
             {data.vulnerabilities.length} CVE{data.vulnerabilities.length > 1 ? "s" : ""}
           </span>
         )}
       </div>
 
       {/* Quick Action Simulator Hint */}
-      <div className="mt-2 pt-1 border-t border-slate-800/60 text-[9px] text-slate-400 text-center font-mono hover:text-accent-blue transition-colors">
+      <div className="mt-2 pt-1 border-t border-slate-800/80 text-[9px] text-slate-400 text-center font-mono hover:text-accent-blue">
         Click to Simulate Blast Radius
       </div>
     </div>
   );
-}
+});
 
 interface NetworkGraphProps {
   topology: {
@@ -167,7 +179,7 @@ export default function NetworkGraph({
 }: NetworkGraphProps) {
   const nodeTypes = useMemo(() => ({ hostNode: CustomHostNode }), []);
 
-  // Compute blast radius lookup
+  // Compute blast radius lookup map
   const blastLookup = useMemo(() => {
     const map = new Map<string, number>();
     if (blastRadiusData?.hop_distances) {
@@ -178,67 +190,90 @@ export default function NetworkGraph({
     return map;
   }, [blastRadiusData]);
 
-  // Transform raw nodes to React Flow format
+  // Transform raw nodes to deduplicated React Flow nodes with auto-grid fallback
   const flowNodes: Node[] = useMemo(() => {
-    return (topology.nodes || [])
-      .filter((node) => Boolean(node?.id && node?.type !== "Vulnerability"))
-      .map((node) => {
-      const pos = TIER_POSITIONS[node.id] || { x: 300, y: 300 };
-      const hops = blastLookup.get(node.id);
-      const isOrigin = blastRadiusData?.origin_node?.id === node.id;
+    const seen = new Set<string>();
+    const validNodes = (topology.nodes || []).filter(
+      (node) => Boolean(node?.id && node?.type !== "Vulnerability")
+    );
 
-      return {
-        id: node.id,
-        type: "hostNode",
-        position: pos,
-        data: {
-          ...node,
-          isBlastRadius: !!hops && !isOrigin,
-          blastHops: hops,
-          onSelectNode,
-        },
-      };
-    });
+    return validNodes
+      .filter((node) => {
+        if (seen.has(node.id)) return false;
+        seen.add(node.id);
+        return true;
+      })
+      .map((node, idx) => {
+        let pos = TIER_POSITIONS[node.id];
+        if (!pos) {
+          const xBase = TIER_X_OFFSETS[node.tier] || 500;
+          const yBase = 80 + (idx % 5) * 130;
+          pos = { x: xBase, y: yBase };
+        }
+        const hops = blastLookup.get(node.id);
+        const isOrigin = blastRadiusData?.origin_node?.id === node.id;
+
+        return {
+          id: node.id,
+          type: "hostNode",
+          position: pos,
+          data: {
+            ...node,
+            isBlastRadius: !!hops && !isOrigin,
+            blastHops: hops,
+            onSelectNode,
+          },
+        };
+      });
   }, [topology.nodes, blastLookup, blastRadiusData, onSelectNode]);
 
-  // Transform edges with dynamic cyber-attack highlights
+  // Deduplicate and style edges efficiently
   const flowEdges: Edge[] = useMemo(() => {
     const compNodeIds = new Set(
       (topology.nodes || []).filter((n) => n.compromised).map((n) => n.id)
     );
 
-    return (topology.edges || []).map((edge) => {
-      const isTraversed =
-        compNodeIds.has(edge.source) && compNodeIds.has(edge.target);
-      const isBlocked = edge.status === "blocked";
+    const seenEdges = new Set<string>();
 
-      let strokeColor = "#334155";
-      let animated = false;
-      let strokeWidth = 2;
+    return (topology.edges || [])
+      .filter((edge) => {
+        const key = `${edge.source}->${edge.target}`;
+        if (seenEdges.has(key)) return false;
+        seenEdges.add(key);
+        return true;
+      })
+      .map((edge) => {
+        const isTraversed =
+          compNodeIds.has(edge.source) && compNodeIds.has(edge.target);
+        const isBlocked = edge.status === "blocked";
 
-      if (isBlocked) {
-        strokeColor = "#64748b";
-      } else if (isTraversed) {
-        strokeColor = "#f43f5e";
-        animated = true;
-        strokeWidth = 3;
-      }
+        let strokeColor = "#334155";
+        let animated = false;
+        let strokeWidth = 2;
 
-      return {
-        id: edge.id || `e-${edge.source}-${edge.target}`,
-        source: edge.source,
-        target: edge.target,
-        type: "smoothstep",
-        animated,
-        style: {
-          stroke: strokeColor,
-          strokeWidth,
-          strokeDasharray: isBlocked ? "5,5" : undefined,
-        },
-        label: isBlocked ? "BLOCKED" : undefined,
-        labelStyle: { fill: "#f87171", fontSize: 10, fontFamily: "monospace" },
-      };
-    });
+        if (isBlocked) {
+          strokeColor = "#64748b";
+        } else if (isTraversed) {
+          strokeColor = "#f43f5e";
+          animated = true;
+          strokeWidth = 3;
+        }
+
+        return {
+          id: edge.id || `e-${edge.source}-${edge.target}`,
+          source: edge.source,
+          target: edge.target,
+          type: "smoothstep",
+          animated,
+          style: {
+            stroke: strokeColor,
+            strokeWidth,
+            strokeDasharray: isBlocked ? "5,5" : undefined,
+          },
+          label: isBlocked ? "BLOCKED" : undefined,
+          labelStyle: { fill: "#f87171", fontSize: 10, fontFamily: "monospace" },
+        };
+      });
   }, [topology.edges, topology.nodes]);
 
   return (
@@ -248,9 +283,11 @@ export default function NetworkGraph({
         edges={flowEdges}
         nodeTypes={nodeTypes}
         fitView
+        fitViewOptions={{ padding: 0.15 }}
+        onlyRenderVisibleElements={true}
         attributionPosition="bottom-right"
-        minZoom={0.3}
-        maxZoom={1.5}
+        minZoom={0.25}
+        maxZoom={1.75}
       >
         <Background color="#1e293b" gap={20} size={1} />
         <Controls className="!bg-slate-900 !border-slate-700 !text-slate-200 fill-slate-200 rounded-lg shadow-xl" />
@@ -261,12 +298,12 @@ export default function NetworkGraph({
             return "#3b82f6";
           }}
           maskColor="rgba(7, 11, 19, 0.7)"
-          className="!bg-slate-900/90 !border !border-slate-800 rounded-lg"
+          className="!bg-slate-900 !border !border-slate-800 rounded-lg"
         />
       </ReactFlow>
 
       {/* Legend Overlay */}
-      <div className="absolute top-4 left-4 bg-slate-900/90 border border-slate-800 p-3 rounded-lg backdrop-blur-md z-10 text-xs font-mono space-y-1.5 shadow-2xl">
+      <div className="absolute top-4 left-4 bg-slate-900/95 border border-slate-800 p-3 rounded-lg z-10 text-xs font-mono space-y-1.5 shadow-xl">
         <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
           <Terminal className="w-3.5 h-3.5 text-accent-blue" />
           Attack Path Legend
@@ -276,7 +313,7 @@ export default function NetworkGraph({
           <span className="text-slate-300">Clean / Monitored Asset</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-rose-500 animate-pulse shadow-sm shadow-rose-500/50" />
+          <div className="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50" />
           <span className="text-rose-400 font-bold">Compromised Foothold</span>
         </div>
         <div className="flex items-center gap-2">

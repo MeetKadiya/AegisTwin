@@ -58,145 +58,132 @@ def get_default_topology() -> Dict[str, Any]:
             "tier": "DMZ",
             "type": "VPN",
             "os": "FortiOS 7.0",
-            "criticality": 7.5,
+            "criticality": 8.0,
             "compromised": False,
             "compromise_step": None,
-            "services": ["SSL-VPN/443", "IKE/500"],
+            "services": ["HTTPS/443", "IKE/500"],
             "vulnerabilities": [
                 {
-                    "cve": "CVE-2023-46805",
-                    "title": "Authentication Bypass in Web Management",
-                    "cvss": 8.2,
+                    "cve": "CVE-2023-27997",
+                    "title": "FortiOS SSL-VPN Heap Buffer Overflow RCE",
+                    "cvss": 9.8,
                     "mitre": "T1190"
                 }
             ],
-            "credentials": ["vpn_service_token"]
+            "credentials": []
         },
 
         # --- WEB TIER ---
         {
             "id": "web-app-01",
-            "label": "Customer Portal App",
-            "hostname": "web-app-01.internal",
+            "label": "Customer Portal Frontend",
+            "hostname": "web-app-01.corp.internal",
             "ip": "10.0.2.20",
             "tier": "Web Tier",
             "type": "Web Server",
-            "os": "Debian 11 (Bullseye)",
+            "os": "Debian 12 Bookworm",
             "criticality": 7.0,
             "compromised": False,
             "compromise_step": None,
-            "services": ["Tomcat/8080", "SSH/22"],
+            "services": ["Node.js/3000", "Nginx/80"],
             "vulnerabilities": [
                 {
                     "cve": "CVE-2021-44228",
-                    "title": "Apache Log4j2 JNDI RCE (Log4Shell)",
+                    "title": "Log4Shell Remote Code Execution in Log4j",
                     "cvss": 10.0,
                     "mitre": "T1190"
-                },
-                {
-                    "cve": "CVE-2022-22965",
-                    "title": "Spring Framework RCE (Spring4Shell)",
-                    "cvss": 9.8,
-                    "mitre": "T1059"
                 }
             ],
-            "credentials": ["db_readonly_user"]
+            "credentials": ["portal_api_token"]
         },
         {
             "id": "api-gateway",
             "label": "Internal API Gateway",
-            "hostname": "api.internal",
-            "ip": "10.0.2.25",
+            "hostname": "api-gw.corp.internal",
+            "ip": "10.0.2.30",
             "tier": "Web Tier",
             "type": "API Gateway",
-            "os": "Alpine Linux 3.18",
+            "os": "Alpine Linux 3.19",
             "criticality": 7.5,
             "compromised": False,
             "compromise_step": None,
-            "services": ["Kong/8443", "gRPC/9090"],
+            "services": ["Kong/8000", "gRPC/9090"],
             "vulnerabilities": [
                 {
-                    "cve": "CVE-2023-22515",
-                    "title": "Broken Access Control & Privilege Escalation",
-                    "cvss": 9.8,
-                    "mitre": "T1068"
+                    "cve": "CVE-2023-41053",
+                    "title": "Redis Cache Invalidation Desync",
+                    "cvss": 6.5,
+                    "mitre": "T1562.001"
                 }
             ],
-            "credentials": ["api_jwt_secret"]
+            "credentials": ["service_account_token"]
         },
 
-        # --- APPLICATION TIER ---
+        # --- APP TIER ---
         {
             "id": "app-srv-01",
-            "label": "Payment Processing Engine",
-            "hostname": "payment-srv.internal",
-            "ip": "10.0.3.30",
+            "label": "Core Banking Application Server",
+            "hostname": "app-srv-01.corp.internal",
+            "ip": "10.0.3.10",
             "tier": "App Tier",
             "type": "Application Server",
             "os": "Red Hat Enterprise Linux 9",
             "criticality": 9.0,
             "compromised": False,
             "compromise_step": None,
-            "services": ["gRPC/50051", "Prometheus/9100"],
+            "services": ["Spring-Boot/8080", "JMX/1099"],
             "vulnerabilities": [
                 {
-                    "cve": "CVE-2023-32315",
-                    "title": "Openfire Remote Code Execution",
-                    "cvss": 8.8,
-                    "mitre": "T1059"
+                    "cve": "CVE-2022-22965",
+                    "title": "Spring4Shell: Remote Code Execution via Data Binding",
+                    "cvss": 9.8,
+                    "mitre": "T1190"
                 }
             ],
-            "credentials": ["db_master_connection_string", "stripe_live_key"]
+            "credentials": ["app_to_db_svc_account", "jwt_signing_key"]
         },
         {
             "id": "app-srv-02",
-            "label": "CRM & Billing Service",
-            "hostname": "crm-srv.internal",
-            "ip": "10.0.3.31",
+            "label": "Payment Processing Backend",
+            "hostname": "app-srv-02.corp.internal",
+            "ip": "10.0.3.20",
             "tier": "App Tier",
             "type": "Application Server",
+            "os": "Red Hat Enterprise Linux 9",
+            "criticality": 9.2,
+            "compromised": False,
+            "compromise_step": None,
+            "services": ["Golang-Microservice/8443"],
+            "vulnerabilities": [],
+            "credentials": ["pci_dss_encryption_key"]
+        },
+        {
+            "id": "ci-cd-runner",
+            "label": "GitLab CI/CD Build Runner",
+            "hostname": "runner-01.corp.internal",
+            "ip": "10.0.3.99",
+            "tier": "App Tier",
+            "type": "Build Server",
             "os": "Ubuntu 22.04 LTS",
             "criticality": 8.0,
             "compromised": False,
             "compromise_step": None,
-            "services": ["NodeJS/3000", "Redis-Client/6379"],
+            "services": ["Docker-Daemon/2375", "GitLab-Runner/8093"],
             "vulnerabilities": [
                 {
-                    "cve": "CVE-2023-26159",
-                    "title": "Prototype Pollution in Follow-Redirects",
-                    "cvss": 7.5,
-                    "mitre": "T1059"
+                    "cve": "CVE-2024-21626",
+                    "title": "runc Container Escape via File Descriptor Leak",
+                    "cvss": 8.6,
+                    "mitre": "T1611"
                 }
             ],
-            "credentials": []
-        },
-        {
-            "id": "ci-cd-runner",
-            "label": "Jenkins CI/CD Build Node",
-            "hostname": "build-runner-01.internal",
-            "ip": "10.0.3.40",
-            "tier": "App Tier",
-            "type": "CI/CD Server",
-            "os": "Ubuntu 20.04 LTS",
-            "criticality": 8.5,
-            "compromised": False,
-            "compromise_step": None,
-            "services": ["Jenkins/8080", "Docker-Socket/2375", "SSH/22"],
-            "vulnerabilities": [
-                {
-                    "cve": "CVE-2024-23897",
-                    "title": "Jenkins CLI Arbitrary File Read & Credential Stealing",
-                    "cvss": 9.8,
-                    "mitre": "T1552"
-                }
-            ],
-            "credentials": ["aws_prod_credentials", "id_rsa_deploy_key"]
+            "credentials": ["docker_hub_write_token", "k8s_deploy_sa"]
         },
 
         # --- DATABASE TIER ---
         {
             "id": "db-cluster-01",
-            "label": "Customer PII Database",
+            "label": "Primary PostgreSQL Cluster",
             "hostname": "pg-cluster-01.db.internal",
             "ip": "10.0.4.50",
             "tier": "DB Tier",
@@ -310,33 +297,46 @@ def get_default_topology() -> Dict[str, Any]:
 
 
 def seed_database():
-    """Initializes or resets the digital twin topology in Neo4j and memory engine."""
+    """Initializes or resets the digital twin topology in Neo4j idempotently with MERGE."""
     data = get_default_topology()
     graph_engine.set_memory_topology(data["nodes"], data["edges"])
 
     if graph_engine.is_neo4j_connected:
         try:
-            logger.info("Executing Cypher seed script in Neo4j...")
-            # Clean existing nodes
+            # 1. Clean existing database first to eliminate any prior duplicates
             graph_engine.run_cypher("MATCH (n) DETACH DELETE n")
 
-            # Insert Hosts
+            # 2. Enforce uniqueness constraints (guaranteed clean baseline)
+            try:
+                graph_engine.run_cypher(
+                    "CREATE CONSTRAINT host_id_unique IF NOT EXISTS FOR (h:Host) REQUIRE h.id IS UNIQUE"
+                )
+                graph_engine.run_cypher(
+                    "CREATE CONSTRAINT vuln_cve_unique IF NOT EXISTS FOR (v:Vulnerability) REQUIRE v.cve IS UNIQUE"
+                )
+            except Exception as ce:
+                logger.warning(f"Constraint creation notice: {ce}")
+
+            # 3. Idempotently MERGE Hosts
             for n in data["nodes"]:
                 graph_engine.run_cypher(
                     """
-                    CREATE (h:Host {
-                        id: $id,
-                        label: $label,
-                        hostname: $hostname,
-                        ip: $ip,
-                        tier: $tier,
-                        type: $type,
-                        os: $os,
-                        criticality: $criticality,
-                        compromised: $compromised,
-                        services: $services,
-                        credentials: $credentials
-                    })
+                    MERGE (h:Host {id: $id})
+                    ON CREATE SET
+                        h.label = $label,
+                        h.hostname = $hostname,
+                        h.ip = $ip,
+                        h.tier = $tier,
+                        h.type = $type,
+                        h.os = $os,
+                        h.criticality = $criticality,
+                        h.compromised = $compromised,
+                        h.compromise_step = $compromise_step,
+                        h.services = $services,
+                        h.credentials = $credentials
+                    ON MATCH SET
+                        h.compromised = $compromised,
+                        h.compromise_step = $compromise_step
                     """,
                     n
                 )
@@ -352,17 +352,19 @@ def seed_database():
                         {"hid": n["id"], **v}
                     )
 
-            # Insert Connections
+            # 4. Idempotently MERGE Connections
             for e in data["edges"]:
                 graph_engine.run_cypher(
                     """
                     MATCH (s:Host {id: $source}), (t:Host {id: $target})
-                    CREATE (s)-[:CONNECTS_TO {id: $id, status: $status}]->(t)
+                    MERGE (s)-[r:CONNECTS_TO {id: $id}]->(t)
+                    ON CREATE SET r.status = $status
+                    ON MATCH SET r.status = $status
                     """,
                     e
                 )
 
-            logger.info("Successfully seeded enterprise network into Neo4j.")
+            logger.info("Successfully seeded clean enterprise network into Neo4j (12 nodes, 15 edges).")
         except Exception as e:
             logger.error(f"Error seeding Neo4j: {e}")
 
