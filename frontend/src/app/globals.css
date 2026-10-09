@@ -1,72 +1,247 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 240, 246, 252;
-  --background-start-rgb: 9, 13, 22;
-  --background-end-rgb: 5, 8, 15;
+/* 1. Electric Cyberpunk Obsidian (NEW DEFAULT) */
+:root,
+[data-theme="cyberpunk"] {
+  --canvas: #06080F;
+  --surface: #0C101D;
+  --surface-hover: #141B2E;
+  --surface-subtle: #101626;
+  --border: #1C273E;
+  --primary: #00F0FF;
+  --secondary: #8B5CF6;
+  --status-healthy: #00E676;
+  --status-warning: #FFB300;
+  --status-critical: #FF1744;
+  --text-primary: #F0F6FC;
+  --text-muted: #8B949E;
+  --accent-glow: rgba(0, 240, 255, 0.4);
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: radial-gradient(circle at 50% 0%, #17223b 0%, #090d16 60%, #05080f 100%);
+/* 2. Deep Slate SOC Cobalt */
+[data-theme="cobalt"] {
+  --canvas: #0A0D14;
+  --surface: #111622;
+  --surface-hover: #1A2130;
+  --surface-subtle: #151C2C;
+  --border: #222D3F;
+  --primary: #3B82F6;
+  --secondary: #06B6D4;
+  --status-healthy: #10B981;
+  --status-warning: #F59E0B;
+  --status-critical: #EF4444;
+  --text-primary: #F3F4F6;
+  --text-muted: #9CA3AF;
+  --accent-glow: rgba(59, 130, 246, 0.4);
+}
+
+/* 3. Emerald Matrix OT / Industrial SCADA */
+[data-theme="matrix"] {
+  --canvas: #040A07;
+  --surface: #091510;
+  --surface-hover: #10241C;
+  --surface-subtle: #0C1C16;
+  --border: #153628;
+  --primary: #00FF88;
+  --secondary: #00E5FF;
+  --status-healthy: #00FF88;
+  --status-warning: #FFB703;
+  --status-critical: #FF0055;
+  --text-primary: #E8FFF5;
+  --text-muted: #7FA896;
+  --accent-glow: rgba(0, 255, 136, 0.4);
+}
+
+/* 4. Crimson Red Team Breach Ops */
+[data-theme="crimson"] {
+  --canvas: #0A0608;
+  --surface: #140C11;
+  --surface-hover: #22141C;
+  --surface-subtle: #1A1017;
+  --border: #331A26;
+  --primary: #FF2A55;
+  --secondary: #FF708F;
+  --status-healthy: #00E676;
+  --status-warning: #FFB300;
+  --status-critical: #FF1744;
+  --text-primary: #FFF0F4;
+  --text-muted: #A88691;
+  --accent-glow: rgba(255, 42, 85, 0.4);
+}
+
+/* 5. Daylight High-Contrast Tactical */
+[data-theme="daylight"] {
+  --canvas: #F1F5F9;
+  --surface: #FFFFFF;
+  --surface-hover: #F8FAFC;
+  --surface-subtle: #F1F5F9;
+  --border: #CBD5E1;
+  --primary: #2563EB;
+  --secondary: #0284C7;
+  --status-healthy: #059669;
+  --status-warning: #D97706;
+  --status-critical: #DC2626;
+  --text-primary: #0F172A;
+  --text-muted: #64748B;
+  --accent-glow: rgba(37, 99, 235, 0.25);
+}
+
+html, body {
+  background-color: var(--canvas);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   min-height: 100vh;
+  margin: 0;
+  padding: 0;
   overflow-x: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom scrollbars */
+/* Monospace font utility */
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #0d131f;
+  background: var(--canvas);
 }
 ::-webkit-scrollbar-thumb {
-  background: #24324a;
-  border-radius: 3px;
+  background: var(--border);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
+  background: var(--primary);
 }
 
-/* Cyber Glow Animations */
+/* Glassmorphism & Micro-glow utilities */
+.glass-panel {
+  background: var(--surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+.glass-dropdown {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 15px -3px var(--accent-glow);
+}
+
+.hairline-border {
+  border: 1px solid var(--border);
+}
+
+/* Micro-Glow Pulse Animations */
 @keyframes pulse-compromised {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(244, 63, 94, 0.4), inset 0 0 10px rgba(244, 63, 94, 0.2);
-    border-color: #f43f5e;
+    box-shadow: 0 0 15px rgba(255, 23, 68, 0.4), inset 0 0 8px rgba(255, 23, 68, 0.2);
+    border-color: #FF1744;
   }
   50% {
-    box-shadow: 0 0 25px rgba(244, 63, 94, 0.8), inset 0 0 15px rgba(244, 63, 94, 0.4);
-    border-color: #ff2d55;
+    box-shadow: 0 0 25px rgba(255, 23, 68, 0.7), inset 0 0 12px rgba(255, 23, 68, 0.35);
+    border-color: #FF5252;
   }
 }
 
 @keyframes pulse-blast {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
-    border-color: #f59e0b;
+    box-shadow: 0 0 15px rgba(255, 179, 0, 0.35), inset 0 0 6px rgba(255, 179, 0, 0.15);
+    border-color: #FFB300;
   }
   50% {
-    box-shadow: 0 0 25px rgba(245, 158, 11, 0.8);
-    border-color: #fbbf24;
+    box-shadow: 0 0 25px rgba(255, 179, 0, 0.7), inset 0 0 12px rgba(255, 179, 0, 0.3);
+    border-color: #FFD54F;
+  }
+}
+
+@keyframes live-indicator {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+    box-shadow: 0 0 0 6px rgba(0, 230, 118, 0);
   }
 }
 
 .node-compromised {
-  animation: pulse-compromised 2s infinite ease-in-out;
+  animation: pulse-compromised 2.5s infinite ease-in-out;
 }
 
 .node-blast {
-  animation: pulse-blast 2s infinite ease-in-out;
+  animation: pulse-blast 2.5s infinite ease-in-out;
+}
+
+.live-beacon {
+  animation: live-indicator 2s infinite ease-in-out;
 }
 
 /* React Flow styling overrides */
 .react-flow__pane {
   cursor: grab;
+  background-color: var(--canvas);
 }
+
+.react-flow__pane:active {
+  cursor: grabbing;
+}
+
 .react-flow__edge-path {
   stroke-width: 2;
+}
+
+.react-flow__controls {
+  border-radius: 8px !important;
+  overflow: hidden;
+  border: 1px solid var(--border) !important;
+  background-color: var(--surface) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+}
+
+.react-flow__controls-button {
+  background-color: var(--surface) !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--text-muted) !important;
+  fill: var(--text-muted) !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--primary) !important;
+  fill: var(--primary) !important;
+}
+
+.react-flow__minimap {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+/* Recharts Dark Tooltip Overrides */
+.recharts-default-tooltip {
+  background-color: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7) !important;
+  padding: 8px 12px !important;
+  color: var(--text-primary) !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 11px !important;
 }

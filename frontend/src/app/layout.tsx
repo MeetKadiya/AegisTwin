@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AegisTwin | Autonomous AI Cyber Attack Digital Twin",
-  description: "Enterprise Network Topology Threat Simulation with Neo4j and MITRE ATT&CK Mapping",
+  title: "AegisTwin Enterprise SOC | AI Cyber Attack Digital Twin",
+  description: "Enterprise Industrial IoT & Network Digital Twin with MITRE ATT&CK Autonomous Simulation, IEC 62443 Compliance, and Graph-Driven SOAR Remediation",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({
@@ -12,8 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="antialiased min-h-screen bg-background text-slate-100">
+    <html lang="en" className="dark">
+      <body className="antialiased min-h-screen bg-canvas text-typography-primary selection:bg-cyber-blue/30 selection:text-cyber-blue font-sans">
         {children}
       </body>
     </html>

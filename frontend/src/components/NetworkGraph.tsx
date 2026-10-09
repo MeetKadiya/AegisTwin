@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, memo, useCallback } from "react";
+import React, { useMemo, memo, useCallback, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -22,84 +22,104 @@ import {
   Flame,
   CheckCircle2,
   Terminal,
+  Activity,
+  Cpu,
+  Thermometer,
+  Zap,
+  Info,
+  Radio,
 } from "lucide-react";
+import { TopologyNode } from "@/lib/types";
 
-// Tier coordinate layout mapping
+// Tier coordinate layout mapping for industrial digital twin
 export const TIER_POSITIONS: Record<string, { x: number; y: number }> = {
-  "gw-external": { x: 60, y: 220 },
-  "web-dmz-01": { x: 300, y: 140 },
-  "vpn-gateway": { x: 300, y: 320 },
-  "web-app-01": { x: 540, y: 100 },
-  "api-gateway": { x: 540, y: 260 },
-  "app-srv-01": { x: 780, y: 80 },
-  "app-srv-02": { x: 780, y: 220 },
-  "ci-cd-runner": { x: 780, y: 360 },
-  "admin-workstation-01": { x: 780, y: 500 },
-  "db-cluster-01": { x: 1040, y: 120 },
-  "corp-dc-01": { x: 1040, y: 360 },
-  "db-cluster-02": { x: 1260, y: 260 },
+  "gw-external": { x: 40, y: 220 },
+  "web-dmz-01": { x: 280, y: 100 },
+  "vpn-gateway": { x: 280, y: 320 },
+  "web-app-01": { x: 520, y: 60 },
+  "api-gateway": { x: 520, y: 220 },
+  "app-srv-01": { x: 760, y: 60 },
+  "ci-cd-runner": { x: 760, y: 240 },
+  "admin-workstation-01": { x: 760, y: 440 },
+  "plc-rtu-substation": { x: 1010, y: 40 },
+  "scada-historian-01": { x: 1010, y: 190 },
+  "db-cluster-01": { x: 1010, y: 340 },
+  "corp-dc-01": { x: 1260, y: 140 },
+  "db-cluster-02": { x: 1260, y: 320 },
 };
 
 const TIER_X_OFFSETS: Record<string, number> = {
-  "DMZ": 200,
-  "Web Tier": 450,
-  "App Tier": 700,
-  "DB Tier": 950,
-  "Active Directory": 1100,
+  "DMZ": 280,
+  "Web Tier": 520,
+  "App Tier": 760,
+  "OT/ICS Zone": 1010,
+  "DB Tier": 1010,
+  "Active Directory": 1260,
 };
 
 export const TIER_BADGES: Record<string, { bg: string; text: string; label: string }> = {
-  "DMZ": { bg: "bg-purple-950 border-purple-500/50", text: "text-purple-300", label: "DMZ" },
-  "Web Tier": { bg: "bg-blue-950 border-blue-500/50", text: "text-blue-300", label: "Web Tier" },
-  "App Tier": { bg: "bg-cyan-950 border-cyan-500/50", text: "text-cyan-300", label: "App Tier" },
-  "DB Tier": { bg: "bg-amber-950 border-amber-500/50", text: "text-amber-300", label: "Database" },
-  "Active Directory": { bg: "bg-rose-950 border-rose-500/50", text: "text-rose-300", label: "Identity / AD" },
+  "DMZ": { bg: "bg-purple-950/50 border-purple-500/40", text: "text-purple-300", label: "DMZ" },
+  "Web Tier": { bg: "bg-blue-950/50 border-blue-500/40", text: "text-blue-300", label: "Web Tier" },
+  "App Tier": { bg: "bg-cyan-950/50 border-cyan-500/40", text: "text-cyan-300", label: "App Tier" },
+  "OT/ICS Zone": { bg: "bg-emerald-950/50 border-emerald-500/40", text: "text-emerald-300", label: "OT / Purdue L1" },
+  "DB Tier": { bg: "bg-amber-950/50 border-amber-500/40", text: "text-amber-300", label: "DB Storage" },
+  "Active Directory": { bg: "bg-rose-950/50 border-rose-500/40", text: "text-rose-300", label: "Identity (Tier 0)" },
 };
 
-// High-performance memoized host node component
+// High-performance memoized host node component with OT telemetry hover cards
 const CustomHostNode = memo(function CustomHostNode({ data }: NodeProps) {
+  const [showHover, setShowHover] = useState(false);
   const isCompromised = data.compromised;
   const isBlastRadius = data.isBlastRadius;
   const isIsolated = data.isolated;
-  const tierStyle = TIER_BADGES[data.tier] || { bg: "bg-slate-850 border-slate-700", text: "text-slate-300", label: data.tier || "Host" };
-
-  const getNodeIcon = () => {
-    if (data.type === "Gateway" || data.type === "VPN") return <Globe className="w-4 h-4 text-purple-400" />;
-    if (data.type === "Database" || data.type === "Key Management") return <Database className="w-4 h-4 text-amber-400" />;
-    if (data.type === "Domain Controller") return <Lock className="w-4 h-4 text-rose-400" />;
-    return <Server className="w-4 h-4 text-cyan-400" />;
+  const tierStyle = TIER_BADGES[data.tier] || {
+    bg: "bg-surface-subtle border-border",
+    text: "text-typography-muted",
+    label: data.tier || "Host",
   };
 
-  let borderStyle = "border-slate-800 bg-slate-900";
+  const getNodeIcon = () => {
+    if (data.type === "Gateway" || data.type === "VPN")
+      return <Globe className="w-4 h-4 text-purple-400" />;
+    if (data.type === "PLC Controller" || data.tier === "OT/ICS Zone")
+      return <Radio className="w-4 h-4 text-emerald-400" />;
+    if (data.type === "Database" || data.type === "Key Management / Vault")
+      return <Database className="w-4 h-4 text-amber-400" />;
+    if (data.type === "Domain Controller")
+      return <Lock className="w-4 h-4 text-rose-400" />;
+    return <Server className="w-4 h-4 text-cyber-cyan" />;
+  };
+
+  let borderStyle = "border-border bg-surface hover:border-cyber-blue/60";
   let statusBadge = (
-    <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
-      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-      <span>CLEAN</span>
+    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-healthy/10 border border-status-healthy/30 text-[10px] text-status-healthy font-mono">
+      <span className="w-1.5 h-1.5 rounded-full bg-status-healthy" />
+      <span>OPERATIONAL</span>
     </div>
   );
 
   if (isCompromised) {
-    borderStyle = "border-rose-500 bg-rose-950/90 shadow-md shadow-rose-950/60";
+    borderStyle = "border-status-critical bg-status-critical/10 shadow-glow-crimson node-compromised";
     statusBadge = (
-      <div className="flex items-center gap-1 text-[11px] text-rose-400 font-mono font-bold">
-        <Flame className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-critical/20 border border-status-critical/50 text-[10px] text-status-critical font-mono font-bold">
+        <span className="w-1.5 h-1.5 rounded-full bg-status-critical animate-ping" />
         <span>COMPROMISED {data.compromise_step ? `(Step ${data.compromise_step})` : ""}</span>
       </div>
     );
   } else if (isBlastRadius) {
-    borderStyle = "border-amber-400 bg-amber-950/80 shadow-md shadow-amber-950/60";
+    borderStyle = "border-status-warning bg-status-warning/10 shadow-glow-amber node-blast";
     statusBadge = (
-      <div className="flex items-center gap-1 text-[11px] text-amber-300 font-mono font-bold">
-        <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-        <span>BLAST RADIUS (Hop +{data.blastHops || 1})</span>
+      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-status-warning/20 border border-status-warning/40 text-[10px] text-status-warning font-mono font-bold">
+        <span className="w-1.5 h-1.5 rounded-full bg-status-warning" />
+        <span>IN BLAST PATH (+{data.blastHops || 1} HOP)</span>
       </div>
     );
   } else if (isIsolated) {
-    borderStyle = "border-gray-600 bg-gray-900/90 opacity-60";
+    borderStyle = "border-gray-700 bg-surface-subtle/80 opacity-50";
     statusBadge = (
-      <div className="flex items-center gap-1 text-[11px] text-gray-400 font-mono">
+      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gray-800 border border-gray-700 text-[10px] text-gray-400 font-mono">
         <Shield className="w-3 h-3 text-gray-400" />
-        <span>ISOLATED</span>
+        <span>QUARANTINED</span>
       </div>
     );
   }
@@ -108,53 +128,125 @@ const CustomHostNode = memo(function CustomHostNode({ data }: NodeProps) {
     data.onSelectNode?.(data);
   }, [data]);
 
+  const metrics = data.metrics || {
+    temperature: 42.1,
+    voltage: 230.0,
+    packetDropRate: 0.02,
+    cpuLoad: 45,
+    memoryUsage: 55,
+  };
+
   return (
     <div
       onClick={handleClick}
-      className={`relative min-w-[210px] max-w-[240px] rounded-lg border p-3 cursor-pointer select-none ${borderStyle}`}
+      onMouseEnter={() => setShowHover(true)}
+      onMouseLeave={() => setShowHover(false)}
+      className={`relative min-w-[220px] max-w-[250px] rounded-xl border p-3 cursor-pointer select-none transition-all duration-150 shadow-soc-card ${borderStyle}`}
     >
-      <Handle type="target" position={Position.Left} className="w-2.5 h-2.5 !bg-slate-400 border-none" />
-      <Handle type="source" position={Position.Right} className="w-2.5 h-2.5 !bg-slate-400 border-none" />
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="w-2.5 h-2.5 !bg-cyber-blue border border-canvas"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="w-2.5 h-2.5 !bg-cyber-blue border border-canvas"
+      />
 
-      {/* Top Header */}
+      {/* Top Header Row */}
       <div className="flex items-center justify-between mb-2">
-        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-mono font-semibold ${tierStyle.bg} ${tierStyle.text}`}>
+        <span
+          className={`text-[9px] px-1.5 py-0.5 rounded border font-mono font-semibold uppercase tracking-wider ${tierStyle.bg} ${tierStyle.text}`}
+        >
           {tierStyle.label}
         </span>
-        <span className="text-[10px] font-mono px-1 rounded bg-slate-800 text-slate-300">
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-subtle border border-border text-typography-muted">
           Crit: {data.criticality || 5}/10
         </span>
       </div>
 
-      {/* Asset Name & Icon */}
-      <div className="flex items-start gap-2 mb-2">
-        <div className="p-1.5 rounded bg-slate-800 border border-slate-700 mt-0.5">
+      {/* Asset Identity */}
+      <div className="flex items-start gap-2.5 mb-2.5">
+        <div className="p-2 rounded-lg bg-surface-subtle border border-border mt-0.5 shrink-0">
           {getNodeIcon()}
         </div>
         <div className="overflow-hidden">
-          <div className="font-semibold text-xs text-slate-100 truncate" title={data.label}>
+          <div className="font-bold text-xs text-typography-primary truncate" title={data.label}>
             {data.label}
           </div>
-          <div className="text-[11px] text-slate-400 font-mono truncate">
-            {data.ip}
-          </div>
+          <div className="text-[10px] text-cyber-cyan font-mono truncate">{data.ip}</div>
+          <div className="text-[9px] text-typography-muted font-mono truncate">{data.os || "Linux Kernel"}</div>
         </div>
       </div>
 
       {/* Status Bar */}
-      <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
+      <div className="pt-2 border-t border-border flex items-center justify-between">
         {statusBadge}
         {data.vulnerabilities && data.vulnerabilities.length > 0 && (
-          <span className="text-[10px] bg-red-950 text-rose-300 border border-rose-800 font-mono px-1.5 py-0.5 rounded">
+          <span className="text-[9px] bg-status-critical/15 text-status-critical border border-status-critical/30 font-mono px-1.5 py-0.5 rounded font-semibold">
             {data.vulnerabilities.length} CVE{data.vulnerabilities.length > 1 ? "s" : ""}
           </span>
         )}
       </div>
 
-      {/* Quick Action Simulator Hint */}
-      <div className="mt-2 pt-1 border-t border-slate-800/80 text-[9px] text-slate-400 text-center font-mono hover:text-accent-blue">
-        Click to Simulate Blast Radius
+      {/* Micro Telemetry Readout */}
+      <div className="mt-2 pt-1.5 border-t border-border/60 grid grid-cols-2 gap-1 text-[9px] font-mono text-typography-muted">
+        <div className="flex items-center gap-1">
+          <Thermometer className="w-2.5 h-2.5 text-amber-400" />
+          <span>{metrics.temperature ? `${metrics.temperature}°C` : "38.2°C"}</span>
+        </div>
+        <div className="flex items-center gap-1 justify-end">
+          <Cpu className="w-2.5 h-2.5 text-cyber-blue" />
+          <span>CPU: {metrics.cpuLoad ? `${metrics.cpuLoad}%` : "42%"}</span>
+        </div>
       </div>
+
+      {/* Node Hover Card (Telemetry Overlay) */}
+      {showHover && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 rounded-xl glass-dropdown z-50 text-[11px] font-mono shadow-2xl pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between pb-1.5 border-b border-border text-typography-primary font-bold">
+            <span className="truncate">{data.label}</span>
+            <span className="text-cyber-cyan">{data.ip}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 mt-2 text-[10px]">
+            <div>
+              <span className="text-typography-muted">Temperature:</span>
+              <div className="font-semibold text-amber-400">{metrics.temperature || 42}°C</div>
+            </div>
+            <div>
+              <span className="text-typography-muted">Bus Voltage:</span>
+              <div className="font-semibold text-typography-primary">{metrics.voltage || 230} V</div>
+            </div>
+            <div>
+              <span className="text-typography-muted">Packet Drop:</span>
+              <div className="font-semibold text-status-healthy">{metrics.packetDropRate || 0.01}%</div>
+            </div>
+            <div>
+              <span className="text-typography-muted">CPU / RAM:</span>
+              <div className="font-semibold text-cyber-blue">{metrics.cpuLoad || 40}% / {metrics.memoryUsage || 55}%</div>
+            </div>
+          </div>
+
+          {data.services && data.services.length > 0 && (
+            <div className="mt-2 pt-1.5 border-t border-border">
+              <span className="text-typography-muted text-[10px]">Active Port Listeners:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {data.services.slice(0, 3).map((srv: string, i: number) => (
+                  <span key={i} className="text-[9px] px-1 rounded bg-canvas border border-border text-typography-primary">
+                    {srv}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-2 pt-1 border-t border-border/60 text-[9px] text-cyber-blue text-center">
+            Click to inspect attack vector & blast radius
+          </div>
+        </div>
+      )}
     </div>
   );
 });
@@ -164,7 +256,7 @@ interface NetworkGraphProps {
     nodes: any[];
     edges: any[];
   };
-  onSelectNode: (node: any) => void;
+  onSelectNode: (node: TopologyNode) => void;
   blastRadiusData?: {
     reachable_nodes: any[];
     hop_distances: Record<string, number>;
@@ -207,7 +299,7 @@ export default function NetworkGraph({
         let pos = TIER_POSITIONS[node.id];
         if (!pos) {
           const xBase = TIER_X_OFFSETS[node.tier] || 500;
-          const yBase = 80 + (idx % 5) * 130;
+          const yBase = 60 + (idx % 6) * 140;
           pos = { x: xBase, y: yBase };
         }
         const hops = blastLookup.get(node.id);
@@ -247,14 +339,14 @@ export default function NetworkGraph({
           compNodeIds.has(edge.source) && compNodeIds.has(edge.target);
         const isBlocked = edge.status === "blocked";
 
-        let strokeColor = "#334155";
+        let strokeColor = "#222D3F";
         let animated = false;
         let strokeWidth = 2;
 
         if (isBlocked) {
-          strokeColor = "#64748b";
+          strokeColor = "#6B7280";
         } else if (isTraversed) {
-          strokeColor = "#f43f5e";
+          strokeColor = "#EF4444";
           animated = true;
           strokeWidth = 3;
         }
@@ -271,62 +363,63 @@ export default function NetworkGraph({
             strokeDasharray: isBlocked ? "5,5" : undefined,
           },
           label: isBlocked ? "BLOCKED" : undefined,
-          labelStyle: { fill: "#f87171", fontSize: 10, fontFamily: "monospace" },
+          labelStyle: { fill: "#EF4444", fontSize: 10, fontFamily: "JetBrains Mono, monospace", fontWeight: 700 },
         };
       });
   }, [topology.edges, topology.nodes]);
 
   return (
-    <div className="w-full h-full relative rounded-xl overflow-hidden border border-slate-800 bg-[#070b13]">
+    <div className="w-full h-full relative rounded-xl overflow-hidden border border-border bg-canvas">
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.15 }}
+        fitViewOptions={{ padding: 0.12 }}
         onlyRenderVisibleElements={true}
         attributionPosition="bottom-right"
-        minZoom={0.25}
-        maxZoom={1.75}
+        minZoom={0.2}
+        maxZoom={1.8}
       >
-        <Background color="#1e293b" gap={20} size={1} />
-        <Controls className="!bg-slate-900 !border-slate-700 !text-slate-200 fill-slate-200 rounded-lg shadow-xl" />
+        <Background color="#1A2130" gap={24} size={1} />
+        <Controls className="!bg-surface !border-border !text-typography-muted fill-typography-muted rounded-lg shadow-soc-card" />
         <MiniMap
           nodeColor={(n) => {
-            if (n.data?.compromised) return "#f43f5e";
-            if (n.data?.isBlastRadius) return "#f59e0b";
-            return "#3b82f6";
+            if (n.data?.compromised) return "#EF4444";
+            if (n.data?.isBlastRadius) return "#F59E0B";
+            if (n.data?.tier === "OT/ICS Zone") return "#10B981";
+            return "#3B82F6";
           }}
-          maskColor="rgba(7, 11, 19, 0.7)"
-          className="!bg-slate-900 !border !border-slate-800 rounded-lg"
+          maskColor="rgba(10, 13, 20, 0.85)"
+          className="!bg-surface !border !border-border rounded-lg"
         />
       </ReactFlow>
 
-      {/* Legend Overlay */}
-      <div className="absolute top-4 left-4 bg-slate-900/95 border border-slate-800 p-3 rounded-lg z-10 text-xs font-mono space-y-1.5 shadow-xl">
-        <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-          <Terminal className="w-3.5 h-3.5 text-accent-blue" />
-          Attack Path Legend
+      {/* Tactical Attack Path Legend Overlay */}
+      <div className="absolute top-3 left-3 bg-surface/90 border border-border p-3 rounded-xl z-10 text-xs font-mono space-y-1.5 shadow-soc-card backdrop-blur-md">
+        <div className="text-[10px] font-bold text-typography-muted uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+          <Terminal className="w-3.5 h-3.5 text-cyber-blue" />
+          Digital Twin State Legend
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
-          <span className="text-slate-300">Clean / Monitored Asset</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-status-healthy shadow-glow-emerald" />
+          <span className="text-typography-primary">Operational Clean Asset</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50" />
-          <span className="text-rose-400 font-bold">Compromised Foothold</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-status-critical shadow-glow-crimson animate-pulse" />
+          <span className="text-status-critical font-bold">Compromised Foothold</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50" />
-          <span className="text-amber-300">Blast Radius Reachable</span>
+          <div className="w-2.5 h-2.5 rounded-full bg-status-warning shadow-glow-amber" />
+          <span className="text-status-warning">Blast Path Reachable</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-5 h-0.5 bg-rose-500" />
-          <span className="text-slate-400">Active Lateral Movement</span>
+          <div className="w-6 h-0.5 bg-status-critical" />
+          <span className="text-typography-muted">Lateral Movement Pivot</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-5 h-0.5 border-t border-dashed border-slate-500" />
-          <span className="text-slate-500">Segmented / Blocked Edge</span>
+          <div className="w-6 h-0.5 border-t border-dashed border-gray-500" />
+          <span className="text-gray-400">Zero Trust Blocked Edge</span>
         </div>
       </div>
     </div>
