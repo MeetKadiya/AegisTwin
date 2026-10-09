@@ -1,0 +1,216 @@
+global:
+  imageRegistry: "" # Override for air-gapped registry e.g. "harbor.plant.internal/aegistwin"
+  imagePullSecrets: []
+  environment: "production"
+
+# --- Security Defaults (Pod Security Standard: Restricted) ---
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  capabilities:
+    drop:
+      - ALL
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "aegistwin-sa"
+
+# --- BACKEND SERVICE ---
+backend:
+  replicaCount: 2
+  image:
+    repository: aegistwin-backend
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    limits:
+      cpu: "2000m"
+      memory: "2048Mi"
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 80
+  securityContext:
+    runAsUser: 10001
+    runAsGroup: 10001
+  env:
+    PORT: "8000"
+    LOG_LEVEL: "INFO"
+    PROMETHEUS_METRICS: "true"
+
+# --- FRONTEND DASHBOARD ---
+frontend:
+  replicaCount: 2
+  image:
+    repository: aegistwin-frontend
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 75
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+
+# --- EDGE AGENT (TELEMETRY SPOOLER) ---
+edgeAgent:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: aegistwin-edge-agent
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 9090
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  securityContext:
+    runAsUser: 65532
+    runAsGroup: 65532
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+
+# --- NEO4J GRAPH DATABASE ---
+neo4j:
+  image:
+    repository: neo4j
+    tag: "5.26.0-community"
+    pullPolicy: IfNotPresent
+  service:
+    boltPort: 7687
+    httpPort: 7474
+  auth:
+    username: neo4j
+    existingSecret: ""
+    passwordKey: "neo4j-password"
+    defaultPassword: "aegistwin2026"
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+  resources:
+    limits:
+      cpu: "2000m"
+      memory: "4096Mi"
+    requests:
+      cpu: "500m"
+      memory: "1024Mi"
+
+# --- NATS EVENT BROKER ---
+nats:
+  image:
+    repository: nats
+    tag: "2.10-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    clientPort: 4222
+    monitorPort: 8222
+  jetstream:
+    enabled: true
+    fileStore:
+      pvc:
+        size: 10Gi
+  resources:
+    limits:
+      cpu: "1000m"
+      memory: "1024Mi"
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+
+# --- POSTGRESQL MULTI-TENANT ENGINE ---
+postgresql:
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    port: 5432
+  auth:
+    database: aegistwin
+    username: aegis_app
+    defaultPassword: "aegis_secure_password_2026"
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    limits:
+      cpu: "2000m"
+      memory: "2048Mi"
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+
+# --- INGRESS CONTROLLER ---
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "64m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "aegistwin-backend"
+  hosts:
+    - host: aegistwin.internal
+      paths:
+        - path: /api
+          pathType: Prefix
+          serviceName: backend
+          servicePort: 8000
+        - path: /ws
+          pathType: Prefix
+          serviceName: backend
+          servicePort: 8000
+        - path: /
+          pathType: Prefix
+          serviceName: frontend
+          servicePort: 3000
+  tls:
+    - secretName: aegistwin-tls
+      hosts:
+        - aegistwin.internal
+
+# --- NETWORK POLICIES (ZERO TRUST) ---
+networkPolicy:
+  enabled: true
+
+# --- IMMUTABLE AUDIT & ENCRYPTION SECRETS ---
+security:
+  jwtSecret: "aegis-production-secret-replace-with-vault-or-sealedsecret"
+  encryptionKey: "aegis-merkle-audit-encryption-key-256"

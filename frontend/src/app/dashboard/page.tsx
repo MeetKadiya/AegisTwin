@@ -46,6 +46,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"feed" | "remediation">("feed");
   const [connError, setConnError] = useState<string | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
 
   // Fetch topology from backend
   const fetchTopology = useCallback(async () => {
@@ -95,6 +96,69 @@ export default function DashboardPage() {
     fetchTopology();
     fetchSuggestions();
     fetchHistory();
+
+    // Initialize full-duplex WebSocket stream
+    let ws: WebSocket | null = null;
+    let reconnectTimer: any = null;
+
+    const connectWebSocket = () => {
+      try {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.hostname === "localhost" ? "localhost:8000" : window.location.host;
+        const endpoint = `${protocol}//${host}/ws/stream?client_id=dashboard-${Math.random().toString(36).substring(7)}`;
+
+        ws = new WebSocket(endpoint);
+
+        ws.onopen = () => {
+          setWsConnected(true);
+          ws?.send(JSON.stringify({
+            action: "subscribe",
+            channels: ["topology", "telemetry", "alerts"],
+          }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data);
+            if (msg.channel === "topology" && msg.data) {
+              setTopology({
+                nodes: msg.data.nodes || [],
+                edges: msg.data.edges || [],
+              });
+              if (msg.data.risk_summary) {
+                setRiskSummary(msg.data.risk_summary);
+              }
+            } else if (msg.channel === "alerts" && msg.data) {
+              setSimulationSteps((prev) => {
+                const exists = prev.some((s) => s.step_number === msg.data.step_number);
+                if (exists) return prev;
+                return [msg.data, ...prev];
+              });
+            }
+          } catch (e) {
+            console.debug("[WS] Error parsing stream frame:", e);
+          }
+        };
+
+        ws.onclose = () => {
+          setWsConnected(false);
+          reconnectTimer = setTimeout(connectWebSocket, 3000);
+        };
+
+        ws.onerror = () => {
+          ws?.close();
+        };
+      } catch (err) {
+        console.warn("[WS] Error creating socket:", err);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) ws.close();
+    };
   }, [fetchTopology, fetchSuggestions, fetchHistory]);
 
   // Handle node selection for blast radius
@@ -312,6 +376,15 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3 text-[11px] text-slate-400">
+          <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-mono transition-all ${
+            wsConnected 
+              ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-300" 
+              : "bg-amber-950/60 border-amber-500/40 text-amber-300"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${wsConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+            {wsConnected ? "LIVE STREAM (WebSocket Duplex)" : "STREAM DISCONNECTED"}
+          </span>
+
           <span className="flex items-center gap-1 text-slate-300">
             <Database className="w-3 h-3 text-accent-blue" />
             Neo4j Graph Store Active

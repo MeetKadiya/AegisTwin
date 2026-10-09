@@ -1,0 +1,95 @@
+{{- if .Values.edgeAgent.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aegistwin.fullname" . }}-edge-agent
+  labels:
+    {{- include "aegistwin.labels" . | nindent 4 }}
+    app.kubernetes.io/component: edge-agent
+spec:
+  replicas: {{ .Values.edgeAgent.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "aegistwin.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: edge-agent
+  template:
+    metadata:
+      labels:
+        {{- include "aegistwin.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: edge-agent
+    spec:
+      serviceAccountName: {{ include "aegistwin.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.edgeAgent.securityContext.runAsUser }}
+        runAsGroup: {{ .Values.edgeAgent.securityContext.runAsGroup }}
+        fsGroup: {{ .Values.edgeAgent.securityContext.runAsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: edge-agent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+          image: "{{ if .Values.global.imageRegistry }}{{ .Values.global.imageRegistry }}/{{ end }}{{ .Values.edgeAgent.image.repository }}:{{ .Values.edgeAgent.image.tag }}"
+          imagePullPolicy: {{ .Values.edgeAgent.image.pullPolicy }}
+          ports:
+            - name: http-ingest
+              containerPort: 9090
+              protocol: TCP
+          env:
+            - name: NATS_URL
+              value: "nats://{{ include "aegistwin.fullname" . }}-nats:{{ .Values.nats.service.clientPort }}"
+            - name: BUFFER_DB_PATH
+              value: "/data/edge_buffer.db"
+            - name: TOPIC_PREFIX
+              value: "aegistwin.telemetry"
+            - name: PORT
+              value: "9090"
+          livenessProbe:
+            tcpSocket:
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            tcpSocket:
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.edgeAgent.resources | nindent 12 }}
+          volumeMounts:
+            - name: edge-buffer-storage
+              mountPath: /data
+      volumes:
+        - name: edge-buffer-storage
+          {{- if .Values.edgeAgent.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "aegistwin.fullname" . }}-edge-agent-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- if .Values.edgeAgent.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "aegistwin.fullname" . }}-edge-agent-pvc
+  labels:
+    {{- include "aegistwin.labels" . | nindent 4 }}
+    app.kubernetes.io/component: edge-agent
+spec:
+  accessModes:
+    - {{ .Values.edgeAgent.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.edgeAgent.persistence.size }}
+  {{- if .Values.edgeAgent.persistence.storageClass }}
+  storageClassName: {{ .Values.edgeAgent.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -160,7 +160,11 @@ func (p *TelemetryPipeline) processItem(item *IngestItem) {
 	case pb.ProtocolType_PROTOCOL_OPC_UA:
 		rec, err = parser.ParseOPCUA(item.Data)
 	case pb.ProtocolType_PROTOCOL_MQTT:
-		rec, err = parser.ParseMQTT(item.Topic, item.Data)
+		if len(item.Topic) >= 7 && item.Topic[:7] == "spBv1.0" {
+			rec, err = parser.ParseSparkplugB(item.Topic, item.Data)
+		} else {
+			rec, err = parser.ParseMQTT(item.Topic, item.Data)
+		}
 	case pb.ProtocolType_PROTOCOL_SYSLOG:
 		rec, err = parser.ParseSyslog(item.Data)
 	default:

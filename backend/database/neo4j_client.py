@@ -221,6 +221,108 @@ class GraphEngine:
             "vulnerabilities_exposed": total_vulns
         }
 
+    def calculate_attack_paths(
+        self,
+        start_node_id: str,
+        target_node_id: Optional[str] = None,
+        max_depth: int = 5,
+    ) -> Dict[str, Any]:
+        """
+        Calculates topological attack propagation paths through active edges
+        from a start node to designated targets or all critical crown-jewel assets.
+        Identifies chokepoints / bottleneck nodes for proactive segmentation.
+        """
+        adj: Dict[str, List[str]] = {}
+        for edge in self.edges:
+            if edge.get("status", "active") == "active":
+                adj.setdefault(edge["source"], []).append(edge["target"])
+
+        start_node = self.nodes.get(start_node_id)
+        if not start_node:
+            return {"error": f"Origin node '{start_node_id}' not found"}
+
+        # Target selection: specific target or all nodes with criticality >= 8.5
+        target_ids = set()
+        if target_node_id:
+            if target_node_id in self.nodes:
+                target_ids.add(target_node_id)
+        else:
+            target_ids = {
+                nid for nid, n in self.nodes.items()
+                if float(n.get("criticality") or 0) >= 8.5 and nid != start_node_id
+            }
+
+        # Find all paths via DFS up to max_depth
+        all_paths: List[List[str]] = []
+
+        def dfs(current: str, path: List[str]):
+            if len(path) > max_depth + 1:
+                return
+            if current in target_ids and len(path) > 1:
+                all_paths.append(list(path))
+            for neighbor in adj.get(current, []):
+                if neighbor not in path:
+                    dfs(neighbor, path + [neighbor])
+
+        dfs(start_node_id, [start_node_id])
+
+        # Evaluate risk score & MITRE techniques per path
+        evaluated_paths = []
+        node_path_frequency: Dict[str, int] = {}
+
+        for p in all_paths:
+            nodes_in_path = [self.nodes[nid] for nid in p if nid in self.nodes]
+            dest_node = nodes_in_path[-1]
+            dest_crit = float(dest_node.get("criticality") or 5.0)
+
+            # Cumulative exploit score
+            path_vulns = []
+            mitre_chain = []
+            for n in nodes_in_path:
+                for v in n.get("vulnerabilities", []):
+                    path_vulns.append(v)
+                    mitre_chain.append(v.get("mitre", "T1059"))
+
+            # Calculate choke points (intermediate nodes)
+            for nid in p[1:-1]:
+                node_path_frequency[nid] = node_path_frequency.get(nid, 0) + 1
+
+            path_risk = min(100.0, (dest_crit * 7.0) + (len(path_vulns) * 4.0) + max(0, 30.0 - (len(p) * 4.0)))
+
+            evaluated_paths.append({
+                "path_ids": p,
+                "hop_count": len(p) - 1,
+                "destination_asset": dest_node.get("label") or dest_node.get("id"),
+                "destination_tier": dest_node.get("tier"),
+                "destination_criticality": dest_crit,
+                "vulnerabilities_on_path": len(path_vulns),
+                "mitre_chain": list(dict.fromkeys(mitre_chain)),
+                "path_risk_score": round(path_risk, 1),
+            })
+
+        # Sort paths by risk score descending
+        evaluated_paths.sort(key=lambda x: x["path_risk_score"], reverse=True)
+
+        # Chokepoint analysis: node appearing on most attack paths
+        chokepoint_id = None
+        chokepoint_coverage = 0.0
+        if node_path_frequency and evaluated_paths:
+            chokepoint_id = max(node_path_frequency, key=node_path_frequency.get)
+            chokepoint_coverage = round((node_path_frequency[chokepoint_id] / len(evaluated_paths)) * 100.0, 1)
+
+        return {
+            "origin_node": start_node,
+            "total_attack_paths_found": len(evaluated_paths),
+            "target_critical_assets_exposed": len({p["path_ids"][-1] for p in evaluated_paths}),
+            "highest_risk_path_score": evaluated_paths[0]["path_risk_score"] if evaluated_paths else 0.0,
+            "top_chokepoint_node": {
+                "node_id": chokepoint_id,
+                "paths_mitigated_percentage": chokepoint_coverage,
+                "recommendation": f"Segment or isolate '{chokepoint_id}' to eliminate {chokepoint_coverage}% of lateral movement attack paths.",
+            } if chokepoint_id else None,
+            "attack_paths": evaluated_paths[:15],
+        }
+
     def apply_remediation(self, action_type: str, target_id: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Mutates graph to apply remediation:

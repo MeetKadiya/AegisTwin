@@ -13,18 +13,30 @@ COPY . .
 RUN mkdir -p public
 RUN npm run build
 
+# Stage 2: Production Hardened Non-Root Alpine Runner
 FROM node:22-alpine AS runner
+
+LABEL maintainer="AegisTwin Frontend Engineering <frontend@aegistwin.internal>" \
+      org.opencontainers.image.title="AegisTwin Operations Dashboard" \
+      org.opencontainers.image.description="Real-time SOC & OT security twin user interface" \
+      org.opencontainers.image.version="2.0.0"
+
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+ENV NODE_ENV=production \
+    PORT=3000 \
+    HOSTNAME="0.0.0.0"
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY docker-entrypoint.sh ./
+# Copy built application assets and ensure ownership belongs to non-root 'node' user (UID 1000)
+COPY --from=builder --chown=node:node /app/public ./public
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --chown=node:node docker-entrypoint.sh ./
+
 RUN chmod +x docker-entrypoint.sh
+
+# Non-root user execution context
+USER node:node
 
 EXPOSE 3000
 

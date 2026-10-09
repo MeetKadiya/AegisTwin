@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "aegistwin.fullname" . }}-nats
+  labels:
+    {{- include "aegistwin.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nats
+spec:
+  serviceName: {{ include "aegistwin.fullname" . }}-nats
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "aegistwin.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nats
+  template:
+    metadata:
+      labels:
+        {{- include "aegistwin.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: nats
+    spec:
+      serviceAccountName: {{ include "aegistwin.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: nats
+          image: "{{ if .Values.global.imageRegistry }}{{ .Values.global.imageRegistry }}/{{ end }}{{ .Values.nats.image.repository }}:{{ .Values.nats.image.tag }}"
+          imagePullPolicy: {{ .Values.nats.image.pullPolicy }}
+          args:
+            - "-js"
+            - "-sd"
+            - "/data"
+            - "-m"
+            - "8222"
+          ports:
+            - name: nats
+              containerPort: 4222
+            - name: monitor
+              containerPort: 8222
+          resources:
+            {{- toYaml .Values.nats.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8222
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8222
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: nats-storage
+              mountPath: /data
+  {{- if .Values.nats.jetstream.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: nats-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.nats.jetstream.fileStore.pvc.size }}
+  {{- else }}
+      volumes:
+        - name: nats-storage
+          emptyDir: {}
+  {{- end }}

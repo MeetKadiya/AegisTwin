@@ -5,9 +5,11 @@ from typing import Dict, Any, List, Optional
 try:
     from ..agents.red_team_agent import red_team_agent
     from ..database.neo4j_client import graph_engine
+    from ..streaming.websocket_hub import ws_hub
 except (ImportError, ValueError):
     from agents.red_team_agent import red_team_agent
     from database.neo4j_client import graph_engine
+    from streaming.websocket_hub import ws_hub
 
 
 router = APIRouter(prefix="/api/simulation", tags=["Simulation"])
@@ -19,13 +21,14 @@ class SimulationStartRequest(BaseModel):
 
 
 @router.post("/start")
-def start_simulation(req: SimulationStartRequest):
+async def start_simulation(req: SimulationStartRequest):
     """
     Initiates the autonomous Red Team adversary simulation.
     Maps attack paths through Neo4j graph nodes and attributes MITRE ATT&CK TTPs.
     """
     result = red_team_agent.run_full_simulation(max_steps=req.max_steps or 10)
     topology = graph_engine.get_topology()
+    await ws_hub.broadcast("topology", topology)
     return {
         "status": "COMPLETED",
         "result": result,
@@ -34,16 +37,22 @@ def start_simulation(req: SimulationStartRequest):
 
 
 @router.post("/step")
-def step_simulation():
+async def step_simulation():
     """Executes a single lateral movement or exploit step in the simulation."""
     result = red_team_agent.execute_next_step()
+    topology = graph_engine.get_topology()
+    await ws_hub.broadcast("topology", topology)
+    if result.get("step"):
+        await ws_hub.broadcast("alerts", result["step"])
     return result
 
 
 @router.post("/reset")
-def reset_simulation():
+async def reset_simulation():
     """Resets the simulation state and cleans compromise flags across all nodes."""
     red_team_agent.reset()
+    topology = graph_engine.get_topology()
+    await ws_hub.broadcast("topology", topology)
     return {
         "status": "RESET",
         "message": "All node compromise flags reset to clean baseline."

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aegistwin.fullname" . }}-config
+  labels:
+    {{- include "aegistwin.labels" . | nindent 4 }}
+data:
+  NEO4J_URI: "bolt://{{ include "aegistwin.fullname" . }}-neo4j:{{ .Values.neo4j.service.boltPort }}"
+  NEO4J_USER: {{ .Values.neo4j.auth.username | quote }}
+  POSTGRES_HOST: "{{ include "aegistwin.fullname" . }}-postgres"
+  POSTGRES_PORT: "{{ .Values.postgresql.service.port }}"
+  POSTGRES_DB: {{ .Values.postgresql.auth.database | quote }}
+  POSTGRES_USER: {{ .Values.postgresql.auth.username | quote }}
+  NATS_URL: "nats://{{ include "aegistwin.fullname" . }}-nats:{{ .Values.nats.service.clientPort }}"
+  ENVIRONMENT: {{ .Values.global.environment | quote }}
+  LOG_LEVEL: {{ .Values.backend.env.LOG_LEVEL | quote }}

@@ -99,10 +99,72 @@ MITRE_TECHNIQUES: Dict[str, Dict[str, Any]] = {
         "description": "Adversaries may use an existing, legitimate external Web service, such as an API or cloud storage, to exfiltrate data.",
         "detection": "Inspect egress web proxy logs for large POST requests or unusual outbound transfers to cloud storage providers (S3, Dropbox, Mega).",
         "mitigation": "M1037 (Filter Network Traffic - Restrict outbound egress to authorized endpoints only)."
+    },
+    # --- MITRE ATT&CK FOR ICS (Industrial Control Systems / OT) ---
+    "T0855": {
+        "id": "T0855",
+        "name": "Unauthorized Command Message",
+        "tactic": "Impair Process Control, Execution",
+        "subtechnique": None,
+        "matrix": "ICS",
+        "description": "Adversaries may send unauthorized commands to control equipment (e.g. Modbus/DNP3/OPC UA write commands) to disrupt physical industrial processes.",
+        "detection": "Establish baselines of command message frequencies and monitor for unauthorized setpoint changes originating from non-HMI/engineering workstations.",
+        "mitigation": "M0930 (Network Segmentation - Enforce Purdue Model L1/L2 firewalls), M0937 (Filter Network Traffic - Inspect industrial protocol commands)."
+    },
+    "T0836": {
+        "id": "T0836",
+        "name": "Modify Parameter",
+        "tactic": "Impair Process Control",
+        "subtechnique": None,
+        "matrix": "ICS",
+        "description": "Adversaries may modify system parameters (e.g. turbine vibration limits, safety trip thresholds, thermal envelopes) to cause physical stress or prevent safety trips.",
+        "detection": "Implement change detection on PLC memory tags and compare live PLC configuration against golden baseline project files.",
+        "mitigation": "M0938 (Execution Prevention - Hardware write-protect key switches), M0926 (Privileged Account Management)."
+    },
+    "T0814": {
+        "id": "T0814",
+        "name": "Denial of Control",
+        "tactic": "Impact",
+        "subtechnique": None,
+        "matrix": "ICS",
+        "description": "Adversaries may degrade, disable, or destroy physical control functions by overwhelming control communications or crashing safety controllers.",
+        "detection": "Monitor network device health and look for unacknowledged command frames, sudden loss of RTU polling, or watchdog timeout alarms.",
+        "mitigation": "M0953 (Redundancy / Diversity of Control Paths), M0930 (Network Segmentation)."
+    },
+    "T0843": {
+        "id": "T0843",
+        "name": "Program Download",
+        "tactic": "Inhibit Response Function, Persistence",
+        "subtechnique": None,
+        "matrix": "ICS",
+        "description": "Adversaries may upload malicious ladder logic or firmware directly onto a programmable logic controller (PLC).",
+        "detection": "Monitor engineering workstation session logs and capture unauthorized upload/download protocol functions (e.g. CIP Class 0x64).",
+        "mitigation": "M0938 (Hardware Key Switches in RUN Mode), M0942 (Code Signing of PLC Firmware)."
+    },
+    "T0887": {
+        "id": "T0887",
+        "name": "Wireless / Industrial Protocol Sniffing",
+        "tactic": "Discovery",
+        "subtechnique": None,
+        "matrix": "ICS",
+        "description": "Adversaries may sniff network traffic to identify industrial protocols, field controller IP addresses, register maps, and unencrypted credentials.",
+        "detection": "Deploy network security monitoring (NSM) to identify unauthorized network taps, promiscuous mode interfaces, or rogue MAC addresses on OT networks.",
+        "mitigation": "M0941 (Encrypt Industrial Communications with mTLS / IPsec), M0930 (Network Segmentation)."
+    },
+    "T0879": {
+        "id": "T0879",
+        "name": "Damage to Property",
+        "tactic": "Impact",
+        "subtechnique": None,
+        "matrix": "ICS",
+        "description": "Adversaries may cause physical destruction of equipment, environmental contamination, or safety hazards by forcing industrial machinery beyond physical limits.",
+        "detection": "Cross-validate cyber telemetry with independent physical sensors (independent vibration, pressure, and thermal safety relays).",
+        "mitigation": "M0927 (Hardwired Physical Interlocks / Relief Valves not controlled by software)."
     }
 }
 
 CVE_MITRE_MAP: Dict[str, str] = {
+    # Enterprise CVEs
     "CVE-2021-44228": "T1190",   # Log4Shell
     "CVE-2022-22965": "T1059",   # Spring4Shell
     "CVE-2020-1472": "T1068",    # ZeroLogon
@@ -112,7 +174,12 @@ CVE_MITRE_MAP: Dict[str, str] = {
     "CVE-2023-32315": "T1059",   # Openfire RCE
     "CVE-2023-26159": "T1059",   # Prototype pollution
     "CVE-2024-23897": "T1552",   # Jenkins CLI file read
-    "CVE-2021-36934": "T1003"    # HiveNightmare SAM read
+    "CVE-2021-36934": "T1003",   # HiveNightmare SAM read
+    # ICS / OT CVEs
+    "CVE-2022-29951": "T0855",   # Schneider Modicon PLC Unauthorized Command
+    "CVE-2021-32998": "T0836",   # Siemens S7 PLC Parameter Tampering
+    "CVE-2023-3595":  "T0843",   # Rockwell ControlLogix Firmware Download
+    "CVE-2020-10644": "T0814",   # Advantech WebAccess SCADA Denial of Control
 }
 
 

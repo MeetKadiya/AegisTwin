@@ -78,10 +78,25 @@ def seed_network():
     return {"message": "Network seeded successfully", "details": res}
 
 
+class AttackPathsRequest(BaseModel):
+    node_id: str
+    target_node_id: Optional[str] = None
+    max_depth: Optional[int] = 5
+
+
 @router.post("/blast-radius")
 def calculate_blast_radius(req: BlastRadiusRequest):
     """Calculates the downstream compromise blast radius for a given host."""
     res = graph_engine.calculate_blast_radius(req.node_id)
+    if "error" in res:
+        raise HTTPException(status_code=404, detail=res["error"])
+    return res
+
+
+@router.post("/attack-paths")
+def calculate_attack_paths(req: AttackPathsRequest):
+    """Calculates topological lateral movement attack propagation paths to critical targets."""
+    res = graph_engine.calculate_attack_paths(req.node_id, req.target_node_id, req.max_depth or 5)
     if "error" in res:
         raise HTTPException(status_code=404, detail=res["error"])
     return res
